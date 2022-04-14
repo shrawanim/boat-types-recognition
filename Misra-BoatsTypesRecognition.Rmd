@@ -1,0 +1,144 @@
+---
+title: "Boat Types Image Classification Assignment3-Misra-BoatTypesRecognition"
+author: "Shrawani Misra"
+date: "12/4/2022"
+output: html_document
+---
+##  **Boat Types Image Classification using Covnet model**
+
+The purpose of this project is to classify what type of boat is based on its appearance. The convolutional neural network model that I create in the subsequent steps will determine if a boat belongs to one of the 9 main categories (buoy, cruise ship, ferry boat, freight boat, gondola, inflatable boat, kayak, paper boat, sailboat). 
+
+Broadly, we will be exploring feature extraction to possibly determine the distinguishing features and important portions of the images. 
+
+
+**Data Source** : Data has been sourced from kaggle ("https://www.kaggle.com/datasets/clorichel/boat-types-recognition"). The dataset contains approximately more than 1000 images in jpg format. So far there were no existing code notebooks for this data in the language R.
+
+
+### **Project Coding**
+
+Loading libraries required for the project; keras and tensorflow will be most helpful as we are exploring CNNs.
+
+```{r}
+library(keras)
+library(reticulate)
+library(tidyverse)
+library(tensorflow)
+library(imager)
+```
+
+### **I. Data Extraction**
+As the data is huge, upon downloading from kaggle it goes into a zip file. Once extracted, the folder is "archive" which subsequently contains folders titled with the types of boats.
+
+```{r}
+original_dataset_dir <- "archive" # we will only use the labelled data
+base_dir <- "." # to store a sebset of data that we are going to use
+```
+Next, to explore data I make three separate folders for Training, Validation and Testing for all 9 different types of boats.
+
+Creating folders and copying files to training, validation and testing folders. As a rule of thumb, I consider ~50% of data for training, ~30% for validation, ~20% for testing. Copying for 9 types of boats, the code snippet is included in R file.
+
+### **II. Creating CNN model**
+
+Building a keras model to recognize patterns. I first make layers of our data and then compile. As our case study is not an "either/or" case for merely 2 outcomes, but for 9 different outcomes, I use **categorical crossentropy loss, optimizer_adam optimizer** and **softmax activation** for our keras model
+
+
+### **III. Data augmentation and pre-processing**
+
+Reading image files, decoding from JPEG to RGB pixel grids, converting to floating-point kernels using Keras. I thus make three separate datagenerators for training, validation and testing and run the model in batches. The class mode I take for this case is categorical.
+
+As there were overfitting issues, I used data augmentation to generate more samples from existing dataset.
+```{r}
+
+
+datagen <- image_data_generator(
+  rescale = 1/255,
+  rotation_range = 40, # randomly rotate images up to 40 degrees
+  width_shift_range = 0.2, # randomly shift 20% pictures horizontally
+  height_shift_range = 0.2, # randomly shift 20% pictures vertically
+  shear_range = 0.2, # randomly apply shearing transformations
+  zoom_range = 0.2, # randomly zooming inside pictures
+  horizontal_flip = TRUE, # randomly flipping half the images horizontally
+  fill_mode = "nearest" # used for filling in newly created pixels
+)
+
+#train_datagen <- image_data_generator(rescale = 1/255)
+#validation_datagen <- image_data_generator(rescale = 1/255)
+#test_datagen <- image_data_generator(rescale = 1/255)
+
+train_generator <- flow_images_from_directory(
+  "train/", # Target directory
+  datagen, # Training data generator
+  target_size = c(150, 150), # Resizes all images to 150 × 150
+  batch_size = 20, # 20 samples in one batch
+  class_mode = "categorical" # Because we use categorical_crossentropy loss,
+  # we need categorical labels.
+)
+
+validation_generator <- flow_images_from_directory(
+  "validation/",
+  datagen,
+  target_size = c(150, 150),
+  batch_size = 20,
+  class_mode = "categorical"
+)
+
+test_generator <- flow_images_from_directory(
+  "test/",
+  datagen,
+  target_size = c(150, 150),
+  batch_size = 20,
+  class_mode = "categorical"
+)
+
+
+```
+
+### **IV. Loading the saved history and model in R Markdown**
+Saving the model as a h5 and history as a rds file I load them as my final model and plot the fit 
+```{r}
+model_file = "final_model.h5"
+history_file = "model_history.rds"
+model_final <- load_model_hdf5(model_file)
+history_final <- read_rds(history_file)
+
+plot(history_final)
+```
+
+**Evaluating the test data**
+```{r}
+model_final %>%
+  evaluate_generator(test_generator, steps = 50)
+
+```
+
+To avoid overfitting, there has been a trade-off with the accuracy of the model which may be worked upon later by increasing epochs. Due to bandwidth limit I have finished with a total of 15 epochs, working with 30 or 45 has been too cumbersome for the system.
+
+Getting the folders in the training data.
+```{r}
+folder_list <- list.files("train/")
+folder_list
+```
+
+Getting the files and visualizing some images in image grids
+
+```{r}
+folder_path <- paste0("train/", folder_list, "/")
+file_name <- map(folder_path, 
+                 function(x) paste0(x, list.files(x))) %>% 
+  unlist()
+sample_image <- sample(file_name, 10)
+
+# Load image into R
+img <- map(sample_image, load.image)
+# Plot image
+par(mfrow = c(2, 5)) # Create 4 x 5 image grid
+map(img, plot)
+```
+
+Thus, this model can determine based on distinguishing features of a given boat what type of boat it may be. Sometimes, misclassifications may occur but the model will give an accurate result 52% of the time.
+ 
+
+
+
+*Showing Proof there is no R code file existing for this dataset on Kaggle.*
+![](https://www.linkpicture.com/q/BoatsScreenshot.jpg)
